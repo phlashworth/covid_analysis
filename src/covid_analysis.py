@@ -6,6 +6,7 @@ from scipy.optimize import curve_fit
 from datetime import date
 #import matplotlib.pylab 
 import matplotlib.pyplot as plt
+from itertools import izip
 
 
 def gaussian(x, amp, cen, wid):
@@ -30,15 +31,14 @@ def set_bounds(ax,x,y):
 countries = ['UK', 'IT', 'FR', 'ES', 'US', 'CN']
 
 params = [100, 0, 1000]
-x = linspace(-40, 40, 81)
+x = linspace(-60, 40, 101)
 
 today = date.today()
 f = lambda x: (x-today).dt.days
-
 dateparse = lambda dates: [pd.datetime.strptime(d, '%d/%m/%Y') for d in dates]
 data = pd.read_csv(
     io.StringIO(
-        get("https://opendata.ecdc.europa.eu/covid19/casedistribution/csv/").content.decode()
+        get("https://opendata.ecdc.europa.eu/covid19/casedistribution/csv/").content.decode('utf-8-sig')
         ),
     header=0,
     parse_dates=['dateRep'],
@@ -58,7 +58,7 @@ data['TotalDeaths']=data.groupby(['geoId'])['deaths'].cumsum()
 
 fig1, ax = plt.subplots(ncols=2, nrows=2)
 
-x_bounds = [-50,14]
+x_bounds = [-50,20]
 
 
 data.groupby(['DayN','geoId']).first()['TotalDeaths'].unstack()[countries].plot(marker='x', linewidth=0, title="Total Deaths", ax=ax[0,1])
@@ -69,19 +69,21 @@ data.groupby(['DayN','geoId']).first()['TotalCases'].unstack()[countries].plot(l
 plt.show(block=False)
 plt.pause(0.001)
 
-for code in countries:
+colors = [line.get_color() for line in ax[0][0].lines]
+
+for code, color in izip(countries, colors):
     try:
-        res = next(x for x, val in enumerate(data[data.geoId==code].deaths) 
+        res = next(x for x, val in enumerate(data[data.geoId==code].TotalDeaths) 
                                   if val > 10) - len(data[data.geoId==code].deaths)
         
         if code=='CN':
-            cn_params, covars = curve_fit(gaussian, data[data.geoId==code].DayN[res:], data[data.geoId==code].deaths[res:], p0=params, maxfev=10000)
-            ax[0,1].plot(x-20,cum_gaussian(x-20, *cn_params), color='blue', linestyle=':')
-            ax[1,1].plot(x-20,cum_gaussian(x-20, *cn_params), color='blue', linestyle=':')
+            cn_params, covars = curve_fit(cum_gaussian, data[data.geoId==code].DayN[res:], data[data.geoId==code].TotalDeaths[res:], p0=params, maxfev=10000)
+            ax[0,1].plot(x-20,cum_gaussian(x-20, *cn_params), color=color, linestyle=':')
+            ax[1,1].plot(x-20,cum_gaussian(x-20, *cn_params), color=color, linestyle=':')
         else:
-            params, covars = curve_fit(gaussian, data[data.geoId==code].DayN[res:], data[data.geoId==code].deaths[res:], p0=params, maxfev=10000)
-            ax[0,1].plot(x[:60],cum_gaussian(x[:60], *params), color='blue', linestyle=':')
-            ax[1,1].plot(x[:60],cum_gaussian(x[:60], *params), color='blue', linestyle=':')
+            params, covars = curve_fit(cum_gaussian, data[data.geoId==code].DayN[res:], data[data.geoId==code].TotalDeaths[res:], p0=params, maxfev=10000)
+            ax[0,1].plot(x[-80:],cum_gaussian(x[-80:], *params), color=color, linestyle=':')
+            ax[1,1].plot(x[-80:],cum_gaussian(x[-80:], *params), color=color, linestyle=':')
         plt.draw()
         plt.pause(0.001)
     except RuntimeError:
@@ -89,19 +91,19 @@ for code in countries:
     except StopIteration:
         print "not enough data to fit Deaths for {}".format((code,))
 
-for code in countries:
+for code, color in izip(countries, colors):
     try:
-        res = next(x for x, val in enumerate(data[data.geoId==code].cases) 
+        res = next(x for x, val in enumerate(data[data.geoId==code].TotalCases) 
                                   if val > 10) - len(data[data.geoId==code].cases)
                                   
         if code=='CN':
-            cn_params, covars = curve_fit(gaussian, data[data.geoId==code].DayN[res:], data[data.geoId==code].cases[res:], p0=params, maxfev=10000)
-            ax[0,0].plot(x-20,cum_gaussian(x-20, *cn_params), color='blue', linestyle=':')
-            ax[1,0].plot(x-20,cum_gaussian(x-20, *cn_params), color='blue', linestyle=':')
+            cn_params, covars = curve_fit(cum_gaussian, data[data.geoId==code].DayN[res:], data[data.geoId==code].TotalCases[res:], p0=params, maxfev=10000)
+            ax[0,0].plot(x-20,cum_gaussian(x-20, *cn_params), color=color, linestyle=':')
+            ax[1,0].plot(x-20,cum_gaussian(x-20, *cn_params), color=color, linestyle=':')
         else:
-            params, covars = curve_fit(gaussian, data[data.geoId==code].DayN[res:], data[data.geoId==code].cases[res:], p0=params, maxfev=10000)
-            ax[0,0].plot(x[:60],cum_gaussian(x[:60], *params), color='blue', linestyle=':')
-            ax[1,0].plot(x[:60],cum_gaussian(x[:60], *params), color='blue', linestyle=':')
+            params, covars = curve_fit(cum_gaussian, data[data.geoId==code].DayN[res:], data[data.geoId==code].TotalCases[res:], p0=params, maxfev=10000)
+            ax[0,0].plot(x[-80:],cum_gaussian(x[-80:], *params), color=color, linestyle=':')
+            ax[1,0].plot(x[-80:],cum_gaussian(x[-80:], *params), color=color, linestyle=':')
         plt.draw()
         plt.pause(0.001)
     except RuntimeError:
@@ -109,6 +111,6 @@ for code in countries:
     except StopIteration:
         print "not enough data to fit for {}".format((code,))
 
-set_bounds([ax[0,0], ax[1,0]], x_bounds, [0, 200000])
-set_bounds([ax[0,1], ax[1,1]], x_bounds, [0, 10000])
+set_bounds([ax[0,0], ax[1,0]], x_bounds, [0, 500000])
+set_bounds([ax[0,1], ax[1,1]], x_bounds, [0, 25000])
 plt.pause(9999)
