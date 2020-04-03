@@ -28,7 +28,7 @@ def set_bounds(ax,x,y):
     ax[1].set_ybound(1,y[1])
 
 
-countries = ['UK', 'IT', 'FR', 'ES', 'US', 'CN']
+countries = ['UK', 'IT', 'FR', 'ES', 'US', 'DE', 'CN']
 
 params = [100, 0, 1000]
 x = linspace(-60, 40, 101)
